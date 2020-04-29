@@ -37,12 +37,12 @@ var (
 	s3Success = prometheus.NewDesc(
 		"probe_success",
 		"Displays whether or not the probe was a success",
-		[]string{"job", "operation", "endpoint"}, nil,
+		[]string{"operation", "s3endpoint"}, nil,
 	)
 	s3Duration = prometheus.NewDesc(
 		"probe_duration_seconds",
 		"Returns how long the probe took to complete in seconds",
-		[]string{"job", "operation", "endpoint"}, nil,
+		[]string{"operation", "s3-endpoint"}, nil,
 	)
 )
 
@@ -99,10 +99,10 @@ func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func()
 	}
 	elapsed := time.Since(start)
 	ch <- prometheus.MustNewConstMetric(
-		s3Success, prometheus.GaugeValue, success, "s3-prober", operation, e.endpoint,
+		s3Success, prometheus.GaugeValue, success, operation, e.endpoint,
 	)
 	ch <- prometheus.MustNewConstMetric(
-		s3Duration, prometheus.GaugeValue, elapsed.Seconds(), "s3-prober", operation, e.endpoint,
+		s3Duration, prometheus.GaugeValue, elapsed.Seconds(), operation, e.endpoint,
 	)
 }
 
