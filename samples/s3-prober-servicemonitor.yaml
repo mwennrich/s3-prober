@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: prometheus
+  name: s3-prober
+spec:
+  endpoints:
+  - path: /metrics
+    port: metrics
+  - path: /probe
+    port: metrics
+  selector:
+    matchLabels:
+      app: s3-prober
