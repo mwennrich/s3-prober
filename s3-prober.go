@@ -37,12 +37,12 @@ var (
 	s3Success = prometheus.NewDesc(
 		"probe_success",
 		"Displays whether or not the probe was a success",
-		[]string{"operation", "s3endpoint"}, nil,
+		[]string{"operation", "s3_endpoint"}, nil,
 	)
 	s3Duration = prometheus.NewDesc(
 		"probe_duration_seconds",
 		"Returns how long the probe took to complete in seconds",
-		[]string{"operation", "s3-endpoint"}, nil,
+		[]string{"operation", "s3_endpoint"}, nil,
 	)
 )
 
@@ -64,7 +64,6 @@ func (e Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect metrics
 func (e Exporter) Collect(ch chan<- prometheus.Metric) {
-
 	minioClient, err := minio.New(e.endpoint, e.accessKey, e.secretKey, true)
 	if err != nil {
 		klog.Fatalf("Could not create minioClient to endpoint %s, %v\n", e.endpoint, err)
@@ -78,7 +77,9 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 		_, err := minioClient.FPutObject(e.bucket, object, e.filename, minio.PutObjectOptions{})
 		return err
 	})
-	measure(e, "get", ch, func() error { return minioClient.FGetObject(e.bucket, object, "/tmp"+object, minio.GetObjectOptions{}) })
+	measure(e, "get", ch, func() error {
+		return minioClient.FGetObject(e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
+	})
 	measure(e, "stat", ch, func() error {
 		_, err := minioClient.StatObject(e.bucket, object, minio.StatObjectOptions{})
 		return err
@@ -107,7 +108,6 @@ func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func()
 }
 
 func probeHandler(w http.ResponseWriter, r *http.Request, e Exporter) {
-
 	registry := prometheus.NewRegistry()
 	registry.Register(e)
 
