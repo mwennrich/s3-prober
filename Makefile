@@ -4,7 +4,7 @@ DOCKER_TAG := $(or ${GITHUB_TAG_NAME}, latest)
 all: s3-prober
 
 .PHONY: s3-prober
-provisioner:
+s3-prober:
 	go build s3-prober.go
 	strip s3-prober
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,7 +15,8 @@ import (
 	"github.com/urfave/cli/v2"
 	"k8s.io/klog"
 
-	"github.com/minio/minio-go/v6"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var (
@@ -64,28 +66,37 @@ func (e Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect metrics
 func (e Exporter) Collect(ch chan<- prometheus.Metric) {
-	minioClient, err := minio.New(e.endpoint, e.accessKey, e.secretKey, true)
+	minioClient, err := minio.New(e.endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(e.accessKey, e.secretKey, ""),
+		Secure: true,
+		Region: "us-east-1",
+	})
 	if err != nil {
-		klog.Fatalf("Could not create minioClient to endpoint %s, %v\n", e.endpoint, err)
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "connect", e.endpoint,
+		)
+		klog.Errorf("Could not create minioClient to endpoint %s, %v\n", e.endpoint, err)
 		return
 	}
 
 	_, object := filepath.Split(e.filename)
 
-	measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(e.bucket, e.location) })
+	measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(context.Background(), e.bucket, minio.MakeBucketOptions{}) })
 	measure(e, "put", ch, func() error {
-		_, err := minioClient.FPutObject(e.bucket, object, e.filename, minio.PutObjectOptions{})
+		_, err := minioClient.FPutObject(context.Background(), e.bucket, object, e.filename, minio.PutObjectOptions{})
 		return err
 	})
 	measure(e, "get", ch, func() error {
-		return minioClient.FGetObject(e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
+		return minioClient.FGetObject(context.Background(), e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
 	})
 	measure(e, "stat", ch, func() error {
-		_, err := minioClient.StatObject(e.bucket, object, minio.StatObjectOptions{})
+		_, err := minioClient.StatObject(context.Background(), e.bucket, object, minio.StatObjectOptions{})
 		return err
 	})
-	measure(e, "remove", ch, func() error { return minioClient.RemoveObject(e.bucket, object) })
-	measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(e.bucket) })
+	measure(e, "remove", ch, func() error {
+		return minioClient.RemoveObject(context.Background(), e.bucket, object, minio.RemoveObjectOptions{})
+	})
+	measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(context.Background(), e.bucket) })
 
 }
 
