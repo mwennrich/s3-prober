@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -54,8 +55,8 @@ type Exporter struct {
 	endpoint  string
 	accessKey string
 	secretKey string
-	location  string
 	filename  string
+	mutex     *sync.Mutex
 }
 
 // Describe all the metrics we export
@@ -66,6 +67,8 @@ func (e Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect metrics
 func (e Exporter) Collect(ch chan<- prometheus.Metric) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
 	minioClient, err := minio.New(e.endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(e.accessKey, e.secretKey, ""),
 		Secure: true,
@@ -81,33 +84,39 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	_, object := filepath.Split(e.filename)
 
-	measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(context.Background(), e.bucket, minio.MakeBucketOptions{}) })
-	measure(e, "put", ch, func() error {
+	err = measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(context.Background(), e.bucket, minio.MakeBucketOptions{}) })
+	if err != nil {
+		// return if makebucket failed
+		return
+	}
+	err = measure(e, "put", ch, func() error {
 		_, err := minioClient.FPutObject(context.Background(), e.bucket, object, e.filename, minio.PutObjectOptions{})
 		return err
 	})
-	measure(e, "get", ch, func() error {
-		return minioClient.FGetObject(context.Background(), e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
-	})
-	measure(e, "stat", ch, func() error {
-		_, err := minioClient.StatObject(context.Background(), e.bucket, object, minio.StatObjectOptions{})
-		return err
-	})
-	measure(e, "remove", ch, func() error {
-		return minioClient.RemoveObject(context.Background(), e.bucket, object, minio.RemoveObjectOptions{})
-	})
+	// only if put succeeded
+	if err == nil {
+		measure(e, "get", ch, func() error {
+			return minioClient.FGetObject(context.Background(), e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
+		})
+		measure(e, "stat", ch, func() error {
+			_, err := minioClient.StatObject(context.Background(), e.bucket, object, minio.StatObjectOptions{})
+			return err
+		})
+		measure(e, "remove", ch, func() error {
+			return minioClient.RemoveObject(context.Background(), e.bucket, object, minio.RemoveObjectOptions{})
+		})
+	}
 	measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(context.Background(), e.bucket) })
-
 }
 
-func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func() error) {
+func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func() error) error {
 	// job = remove
 	success := 1.0
 	start := time.Now()
 	err := f()
 	if err != nil {
 		success = 0
-		klog.Error(err)
+		klog.Error(fmt.Errorf("(%s): %e", operation, err))
 	}
 	elapsed := time.Since(start)
 	ch <- prometheus.MustNewConstMetric(
@@ -116,6 +125,7 @@ func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func()
 	ch <- prometheus.MustNewConstMetric(
 		s3Duration, prometheus.GaugeValue, elapsed.Seconds(), operation, e.endpoint,
 	)
+	return err
 }
 
 func probeHandler(w http.ResponseWriter, r *http.Request, e Exporter) {
@@ -185,7 +195,6 @@ func startCmd() *cli.Command {
 func startDaemon(c *cli.Context) error {
 
 	listenAddress := c.String(flagListenAddress)
-	location := c.String(flagLocation)
 	bucket := c.String(flagBucket)
 	if bucket == "" {
 		return fmt.Errorf("invalid empty flag %v", flagBucket)
@@ -212,8 +221,8 @@ func startDaemon(c *cli.Context) error {
 		accessKey: accessKey,
 		secretKey: secretKey,
 		endpoint:  endpoint,
-		location:  location,
 		filename:  filename,
+		mutex:     &sync.Mutex{},
 	}
 
 	log.Infoln("Starting s3_prober", version.Info())
