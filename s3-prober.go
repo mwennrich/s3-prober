@@ -11,10 +11,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 	"github.com/urfave/cli/v2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -87,26 +86,45 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 	err = measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(context.Background(), e.bucket, minio.MakeBucketOptions{}) })
 	if err != nil {
 		// return if makebucket failed
+		if err != nil {
+			klog.Errorf("error during MakeBucket: %w", err)
+		}
 		return
 	}
 	err = measure(e, "put", ch, func() error {
 		_, err := minioClient.FPutObject(context.Background(), e.bucket, object, e.filename, minio.PutObjectOptions{})
+		if err != nil {
+			klog.Errorf("error during PutObject: %w", err)
+		}
 		return err
 	})
 	// only if put succeeded
 	if err == nil {
-		measure(e, "get", ch, func() error {
+		err = measure(e, "get", ch, func() error {
 			return minioClient.FGetObject(context.Background(), e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
 		})
-		measure(e, "stat", ch, func() error {
+		if err != nil {
+			klog.Errorf("error during GetObject: %w", err)
+		}
+		err = measure(e, "stat", ch, func() error {
 			_, err := minioClient.StatObject(context.Background(), e.bucket, object, minio.StatObjectOptions{})
 			return err
 		})
-		measure(e, "remove", ch, func() error {
+		if err != nil {
+			klog.Errorf("error during StatObject: %w", err)
+		}
+		err = measure(e, "remove", ch, func() error {
 			return minioClient.RemoveObject(context.Background(), e.bucket, object, minio.RemoveObjectOptions{})
 		})
+		if err != nil {
+			klog.Errorf("error during RemoveObject: %w", err)
+		}
 	}
-	measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(context.Background(), e.bucket) })
+	err = measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(context.Background(), e.bucket) })
+	if err != nil {
+		klog.Errorf("error during RemoveBucket: %w", err)
+	}
+
 }
 
 func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func() error) error {
@@ -116,7 +134,6 @@ func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func()
 	err := f()
 	if err != nil {
 		success = 0
-		klog.Error(fmt.Errorf("(%s): %e", operation, err))
 	}
 	elapsed := time.Since(start)
 	ch <- prometheus.MustNewConstMetric(
@@ -130,7 +147,10 @@ func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func()
 
 func probeHandler(w http.ResponseWriter, r *http.Request, e Exporter) {
 	registry := prometheus.NewRegistry()
-	registry.Register(e)
+	err := registry.Register(e)
+	if err != nil {
+		klog.Errorf("failed ot register prometheus: %w", err)
+	}
 
 	// Serve
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
@@ -225,25 +245,29 @@ func startDaemon(c *cli.Context) error {
 		mutex:     &sync.Mutex{},
 	}
 
-	log.Infoln("Starting s3_prober", version.Info())
-	log.Infoln("Build context", version.BuildContext())
+	klog.Infoln("Starting s3_prober", version.Info())
+	klog.Infoln("Build context", version.BuildContext())
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/probe", func(w http.ResponseWriter, r *http.Request) {
 		probeHandler(w, r, exporter)
 	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
+		_, err := w.Write([]byte(`<html>
 						 <head><title>S3 Prober</title></head>
 						 <body>
 						 <h1>S3 Prober</h1>
 						 <p><a href='/metrics'>Metrics</a></p>
 						 </body>
 						 </html>`))
+		if err != nil {
+			klog.Error(err)
+		}
+
 	})
 
-	log.Infoln("Listening on", listenAddress)
-	log.Fatal(http.ListenAndServe(listenAddress, nil))
+	klog.Infoln("Listening on", listenAddress)
+	klog.Fatal(http.ListenAndServe(listenAddress, nil))
 	return nil
 }
 
