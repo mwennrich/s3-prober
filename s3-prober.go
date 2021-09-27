@@ -134,7 +134,6 @@ func measure(e Exporter, operation string, ch chan<- prometheus.Metric, f func()
 	err := f()
 	if err != nil {
 		success = 0
-		klog.Errorf("(%s): %e", operation, err)
 	}
 	elapsed := time.Since(start)
 	ch <- prometheus.MustNewConstMetric(
