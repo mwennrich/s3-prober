@@ -31,8 +31,8 @@ var (
 	envEndpoint          = "ENDPOINT"
 	flagBucket           = "bucket"
 	envBucket            = "BUCKET"
-	flagLocation         = "location"
-	envLocation          = "LOCATION"
+	flagSkipmakedeletebucket = "skipmakedeletebucket"
+	envSkipmakedeletebucket  = "SKIPMAKEDELETEBUCKET"
 	flagFilename         = "filename"
 	envFilename          = "FILENAME"
 
@@ -50,12 +50,13 @@ var (
 
 // Exporter is our exporter type
 type Exporter struct {
-	bucket    string
-	endpoint  string
-	accessKey string
-	secretKey string
-	filename  string
-	mutex     *sync.Mutex
+	bucket           string
+	endpoint         string
+	accessKey        string
+	secretKey        string
+	filename         string
+	skipmakedeletebucket bool
+	mutex            *sync.Mutex
 }
 
 // Describe all the metrics we export
@@ -83,13 +84,25 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	_, object := filepath.Split(e.filename)
 
-	err = measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(context.Background(), e.bucket, minio.MakeBucketOptions{}) })
+	bs, err := minioClient.ListBuckets(context.Background())
 	if err != nil {
-		// return if makebucket failed
-		if err != nil {
-			klog.Errorf("error during MakeBucket: %w", err)
-		}
 		return
+	}
+	found := false
+	for _, b := range bs {
+		if b.Name == e.bucket {
+			found = true
+		}
+	}
+	if !e.skipmakedeletebucket || !found {
+		err = measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(context.Background(), e.bucket, minio.MakeBucketOptions{}) })
+		if err != nil {
+			// return if makebucket failed
+			if err != nil {
+				klog.Errorf("error during MakeBucket: %w", err)
+			}
+			return
+		}
 	}
 	err = measure(e, "put", ch, func() error {
 		_, err := minioClient.FPutObject(context.Background(), e.bucket, object, e.filename, minio.PutObjectOptions{})
@@ -120,9 +133,11 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 			klog.Errorf("error during RemoveObject: %w", err)
 		}
 	}
-	err = measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(context.Background(), e.bucket) })
-	if err != nil {
-		klog.Errorf("error during RemoveBucket: %w", err)
+	if !e.skipmakedeletebucket {
+		err = measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(context.Background(), e.bucket) })
+		if err != nil {
+			klog.Errorf("error during RemoveBucket: %w", err)
+		}
 	}
 
 }
@@ -196,10 +211,10 @@ func startCmd() *cli.Command {
 				Usage:   "Required. Specify filename.",
 				EnvVars: []string{envFilename},
 			},
-			&cli.StringFlag{
-				Name:    flagLocation,
-				Usage:   "Optional. Specify s3 location.",
-				EnvVars: []string{envLocation},
+			&cli.BoolFlag{
+				Name:    flagSkipmakedeletebucket,
+				Usage:   "Optional. Measure skipmakedeletebucket operations",
+				EnvVars: []string{envSkipmakedeletebucket},
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -237,12 +252,13 @@ func startDaemon(c *cli.Context) error {
 	}
 
 	exporter := Exporter{
-		bucket:    bucket,
-		accessKey: accessKey,
-		secretKey: secretKey,
-		endpoint:  endpoint,
-		filename:  filename,
-		mutex:     &sync.Mutex{},
+		bucket:           bucket,
+		accessKey:        accessKey,
+		secretKey:        secretKey,
+		endpoint:         endpoint,
+		filename:         filename,
+		skipmakedeletebucket: c.Bool(flagSkipmakedeletebucket),
+		mutex:            &sync.Mutex{},
 	}
 
 	klog.Infoln("Starting s3_prober", version.Info())
