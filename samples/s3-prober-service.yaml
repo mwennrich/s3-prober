@@ -6,8 +6,8 @@ metadata:
     app: s3-prober
 spec:
   ports:
-  - name: metrics
-    port: 2112
-    targetPort: metrics
+    - name: metrics
+      port: 2112
+      targetPort: metrics
   selector:
     app: s3-prober

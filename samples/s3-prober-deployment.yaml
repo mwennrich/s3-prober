@@ -17,45 +17,45 @@ spec:
       securityContext:
         runAsUser: 999
       containers:
-      - name: s3-prober
-        command:
-        - /s3-prober
-        args:
-        - start
-        image: docker.io/mwennrich/s3-prober:latest
-        ports:
-        - containerPort: 2112
-          name: metrics
-        env:
-        - name: ENDPOINT
-          valueFrom:
-            secretKeyRef:
-              name: s3-prober-config
-              key: endpoint
-        - name: BUCKET
-          valueFrom:
-            secretKeyRef:
-              name: s3-prober-config
-              key: bucket
-        - name: ACCESSKEY
-          valueFrom:
-            secretKeyRef:
-              name: s3-prober-config
-              key: accesskey
-        - name: SECRETKEY
-          valueFrom:
-            secretKeyRef:
-              name: s3-prober-config
-              key: secretkey
-        - name: FILENAME
-          value: "/data/testfile"
-        volumeMounts:
-        - name: testfile
-          mountPath: "/data"
+        - name: s3-prober
+          command:
+            - /s3-prober
+          args:
+            - start
+          image: docker.io/mwennrich/s3-prober:latest
+          ports:
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: s3-prober-config
+                  key: endpoint
+            - name: BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: s3-prober-config
+                  key: bucket
+            - name: ACCESSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-prober-config
+                  key: accesskey
+            - name: SECRETKEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-prober-config
+                  key: secretkey
+            - name: FILENAME
+              value: "/data/testfile"
+          volumeMounts:
+            - name: testfile
+              mountPath: "/data"
       volumes:
-      - name: testfile
-        secret:
-          secretName: s3-prober-config
-          items:
-          - key: filecontent
-            path: testfile
+        - name: testfile
+          secret:
+            secretName: s3-prober-config
+            items:
+              - key: filecontent
+                path: testfile
