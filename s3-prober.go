@@ -86,6 +86,7 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	bs, err := minioClient.ListBuckets(context.Background())
 	if err != nil {
+		klog.Errorf("Failed to list buckets on endpoint %s, %v\n", e.endpoint, err)
 		return
 	}
 	found := false
