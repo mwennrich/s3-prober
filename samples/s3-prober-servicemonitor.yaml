@@ -6,10 +6,10 @@ metadata:
   name: s3-prober
 spec:
   endpoints:
-  - path: /metrics
-    port: metrics
-  - path: /probe
-    port: metrics
+    - path: /metrics
+      port: metrics
+    - path: /probe
+      port: metrics
   selector:
     matchLabels:
       app: s3-prober
