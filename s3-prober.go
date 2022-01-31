@@ -20,21 +20,24 @@ import (
 )
 
 var (
-	flagListenAddress    = "listen"
-	envListenAddress     = "LISTEN_ADDRESS"
-	defaultListenAddress = ":2112"
-	flagAccessKey        = "accesskey"
-	envAccessKey         = "ACCESSKEY"
-	flagSecretKey        = "secretkey"
-	envSecretKey         = "SECRETKEY"
-	flagEndpoint         = "endpoint"
-	envEndpoint          = "ENDPOINT"
-	flagBucket           = "bucket"
-	envBucket            = "BUCKET"
+	flagListenAddress        = "listen"
+	envListenAddress         = "LISTEN_ADDRESS"
+	defaultListenAddress     = ":2112"
+	flagOpTimeout            = "timeout"
+	envOpTimeout             = "OP_TIMEOUT"
+	defaultOpTimeout         = 10
+	flagAccessKey            = "accesskey"
+	envAccessKey             = "ACCESSKEY"
+	flagSecretKey            = "secretkey"
+	envSecretKey             = "SECRETKEY"
+	flagEndpoint             = "endpoint"
+	envEndpoint              = "ENDPOINT"
+	flagBucket               = "bucket"
+	envBucket                = "BUCKET"
 	flagSkipmakedeletebucket = "skipmakedeletebucket"
 	envSkipmakedeletebucket  = "SKIPMAKEDELETEBUCKET"
-	flagFilename         = "filename"
-	envFilename          = "FILENAME"
+	flagFilename             = "filename"
+	envFilename              = "FILENAME"
 
 	s3Success = prometheus.NewDesc(
 		"probe_success",
@@ -50,13 +53,14 @@ var (
 
 // Exporter is our exporter type
 type Exporter struct {
-	bucket           string
-	endpoint         string
-	accessKey        string
-	secretKey        string
-	filename         string
+	bucket               string
+	endpoint             string
+	accessKey            string
+	secretKey            string
+	filename             string
 	skipmakedeletebucket bool
-	mutex            *sync.Mutex
+	mutex                *sync.Mutex
+	opTimeout            int
 }
 
 // Describe all the metrics we export
@@ -73,6 +77,9 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 		Creds:  credentials.NewStaticV4(e.accessKey, e.secretKey, ""),
 		Secure: true,
 		Region: "us-east-1",
+		Transport: &http.Transport{
+			ResponseHeaderTimeout: time.Second * time.Duration(e.opTimeout),
+		},
 	})
 	if err != nil {
 		ch <- prometheus.MustNewConstMetric(
@@ -187,6 +194,12 @@ func startCmd() *cli.Command {
 				EnvVars: []string{envListenAddress},
 				Value:   defaultListenAddress,
 			},
+			&cli.IntFlag{
+				Name:    flagOpTimeout,
+				Usage:   "Optional. Timout in seconds after which an operation is considered as failed.",
+				EnvVars: []string{envOpTimeout},
+				Value:   defaultOpTimeout,
+			},
 			&cli.StringFlag{
 				Name:    flagAccessKey,
 				Usage:   "Required. Specify s3 access key.",
@@ -231,6 +244,7 @@ func startCmd() *cli.Command {
 func startDaemon(c *cli.Context) error {
 
 	listenAddress := c.String(flagListenAddress)
+	opTimeout := c.Int(flagOpTimeout)
 	bucket := c.String(flagBucket)
 	if bucket == "" {
 		return fmt.Errorf("invalid empty flag %v", flagBucket)
@@ -253,13 +267,14 @@ func startDaemon(c *cli.Context) error {
 	}
 
 	exporter := Exporter{
-		bucket:           bucket,
-		accessKey:        accessKey,
-		secretKey:        secretKey,
-		endpoint:         endpoint,
-		filename:         filename,
+		bucket:               bucket,
+		accessKey:            accessKey,
+		secretKey:            secretKey,
+		endpoint:             endpoint,
+		filename:             filename,
 		skipmakedeletebucket: c.Bool(flagSkipmakedeletebucket),
-		mutex:            &sync.Mutex{},
+		mutex:                &sync.Mutex{},
+		opTimeout:            opTimeout,
 	}
 
 	klog.Infoln("Starting s3_prober", version.Info())
