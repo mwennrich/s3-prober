@@ -299,7 +299,12 @@ func startDaemon(c *cli.Context) error {
 	})
 
 	klog.Infoln("Listening on", listenAddress)
-	klog.Fatal(http.ListenAndServe(listenAddress, nil))
+	server := &http.Server{
+		Addr:              listenAddress,
+		ReadHeaderTimeout: 1 * time.Minute,
+	}
+
+	klog.Fatal(server.ListenAndServe())
 	return nil
 }
 
