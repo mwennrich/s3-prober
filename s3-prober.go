@@ -122,7 +122,7 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 	// only if put succeeded
 	if err == nil {
 		err = measure(e, "get", ch, func() error {
-			return minioClient.FGetObject(context.Background(), e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
+			return minioClient.FGetObject(context.Background(), e.bucket, object, "/"+object, minio.GetObjectOptions{})
 		})
 		if err != nil {
 			klog.Errorf("error during GetObject: %w", err)
