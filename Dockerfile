@@ -9,7 +9,7 @@ WORKDIR /work
 RUN make s3-prober
 
 FROM scratch
-COPY --from=builder /work/bin/s3-prober /s3-prober
+COPY --from=builder /work/s3-prober /s3-prober
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 USER 999
