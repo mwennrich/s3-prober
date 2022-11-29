@@ -1,17 +1,15 @@
-FROM golang:1.19-alpine AS build
+FROM golang:1.19 AS builder
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 
 
-COPY . /app
-WORKDIR /app
+COPY / /work
+WORKDIR /work
 
-RUN go build s3-prober.go
+RUN make s3-prober
 
-FROM alpine:latest
+FROM gcr.io/distroless/static
+COPY --from=builder /work/s3-prober /s3-prober
 
-WORKDIR /
-
-COPY --from=build /app .
-
-ENTRYPOINT ./s3-prober
+USER 999
+ENTRYPOINT ["/s3-prober"]
