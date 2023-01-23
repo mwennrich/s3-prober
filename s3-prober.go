@@ -96,6 +96,49 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 	bs, err := minioClient.ListBuckets(ctx)
 	if err != nil {
 		klog.Errorf("Failed to list buckets on endpoint %s, %v\n", e.endpoint, err)
+		if !e.skipmakedeletebucket {
+			ch <- prometheus.MustNewConstMetric(
+				s3Success, prometheus.GaugeValue, 0, "makebucket", e.endpoint,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "makebucket", e.endpoint,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				s3Success, prometheus.GaugeValue, 0, "removebucket", e.endpoint,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "makebucket", e.endpoint,
+			)
+
+		}
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "put", e.endpoint,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "put", e.endpoint,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "get", e.endpoint,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "get", e.endpoint,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "stat", e.endpoint,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "stat", e.endpoint,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "remove", e.endpoint,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "remove", e.endpoint,
+		)
+
 		return
 	}
 	found := false
@@ -142,6 +185,27 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 		if err != nil {
 			klog.Errorf("error during RemoveObject: %w", err)
 		}
+	} else {
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "get", e.endpoint,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "get", e.endpoint,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "stat", e.endpoint,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "stat", e.endpoint,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			s3Success, prometheus.GaugeValue, 0, "remove", e.endpoint,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "remove", e.endpoint,
+		)
 	}
 	if !e.skipmakedeletebucket {
 		err = measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(ctx, e.bucket) })
