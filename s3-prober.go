@@ -93,7 +93,22 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(e.opTimeout))
 	defer cancel()
+
+	// list buckets
+	success := 1.0
+	start := time.Now()
 	bs, err := minioClient.ListBuckets(ctx)
+	if err != nil {
+		success = 0
+	}
+	elapsed := time.Since(start)
+	ch <- prometheus.MustNewConstMetric(
+		s3Success, prometheus.GaugeValue, success, "listbuckets", e.endpoint,
+	)
+	ch <- prometheus.MustNewConstMetric(
+		s3Duration, prometheus.GaugeValue, elapsed.Seconds(), "listbuckets", e.endpoint,
+	)
+
 	if err != nil {
 		klog.Errorf("Failed to list buckets on endpoint %s, %v\n", e.endpoint, err)
 		if !e.skipmakedeletebucket {
