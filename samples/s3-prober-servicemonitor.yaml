@@ -6,10 +6,14 @@ metadata:
   name: s3-prober
 spec:
   endpoints:
-    - path: /metrics
+    - interval: 60s
+      path: /metrics
       port: metrics
-    - path: /probe
+      scrapeTimeout: 59s
+    - interval: 60s
+      path: /probe
       port: metrics
+      scrapeTimeout: 59s
   selector:
     matchLabels:
       app: s3-prober
