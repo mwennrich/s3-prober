@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/version"
 	"github.com/urfave/cli/v2"
 	"k8s.io/klog/v2"
 
@@ -116,13 +116,13 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 				s3Success, prometheus.GaugeValue, 0, "makebucket", e.endpoint,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "makebucket", e.endpoint,
+				s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "makebucket", e.endpoint,
 			)
 			ch <- prometheus.MustNewConstMetric(
 				s3Success, prometheus.GaugeValue, 0, "removebucket", e.endpoint,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "makebucket", e.endpoint,
+				s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "makebucket", e.endpoint,
 			)
 
 		}
@@ -130,28 +130,28 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 			s3Success, prometheus.GaugeValue, 0, "put", e.endpoint,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "put", e.endpoint,
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "put", e.endpoint,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			s3Success, prometheus.GaugeValue, 0, "get", e.endpoint,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "get", e.endpoint,
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "get", e.endpoint,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			s3Success, prometheus.GaugeValue, 0, "stat", e.endpoint,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "stat", e.endpoint,
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "stat", e.endpoint,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			s3Success, prometheus.GaugeValue, 0, "remove", e.endpoint,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "remove", e.endpoint,
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "remove", e.endpoint,
 		)
 
 		return
@@ -165,17 +165,14 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 	if !e.skipmakedeletebucket || !found {
 		err = measure(e, "makebucket", ch, func() error { return minioClient.MakeBucket(ctx, e.bucket, minio.MakeBucketOptions{}) })
 		if err != nil {
-			// return if makebucket failed
-			if err != nil {
-				klog.Errorf("error during MakeBucket: %w", err)
-			}
+			klog.Errorf("error during MakeBucket: %v", err)
 			return
 		}
 	}
 	err = measure(e, "put", ch, func() error {
 		_, err := minioClient.FPutObject(ctx, e.bucket, object, e.filename, minio.PutObjectOptions{})
 		if err != nil {
-			klog.Errorf("error during PutObject: %w", err)
+			klog.Errorf("error during PutObject: %v", err)
 		}
 		return err
 	})
@@ -185,47 +182,47 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 			return minioClient.FGetObject(ctx, e.bucket, object, "/tmp/"+object, minio.GetObjectOptions{})
 		})
 		if err != nil {
-			klog.Errorf("error during GetObject: %w", err)
+			klog.Errorf("error during GetObject: %v", err)
 		}
 		err = measure(e, "stat", ch, func() error {
 			_, err := minioClient.StatObject(ctx, e.bucket, object, minio.StatObjectOptions{})
 			return err
 		})
 		if err != nil {
-			klog.Errorf("error during StatObject: %w", err)
+			klog.Errorf("error during StatObject: %v", err)
 		}
 		err = measure(e, "remove", ch, func() error {
 			return minioClient.RemoveObject(ctx, e.bucket, object, minio.RemoveObjectOptions{})
 		})
 		if err != nil {
-			klog.Errorf("error during RemoveObject: %w", err)
+			klog.Errorf("error during RemoveObject: %v", err)
 		}
 	} else {
 		ch <- prometheus.MustNewConstMetric(
 			s3Success, prometheus.GaugeValue, 0, "get", e.endpoint,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "get", e.endpoint,
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "get", e.endpoint,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			s3Success, prometheus.GaugeValue, 0, "stat", e.endpoint,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "stat", e.endpoint,
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "stat", e.endpoint,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			s3Success, prometheus.GaugeValue, 0, "remove", e.endpoint,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			s3Duration, prometheus.GaugeValue, float64(e.opTimeout) , "remove", e.endpoint,
+			s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "remove", e.endpoint,
 		)
 	}
 	if !e.skipmakedeletebucket {
 		err = measure(e, "removebucket", ch, func() error { return minioClient.RemoveBucket(ctx, e.bucket) })
 		if err != nil {
-			klog.Errorf("error during RemoveBucket: %w", err)
+			klog.Errorf("error during RemoveBucket: %v", err)
 		}
 	}
 
@@ -253,7 +250,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, e Exporter) {
 	registry := prometheus.NewRegistry()
 	err := registry.Register(e)
 	if err != nil {
-		klog.Errorf("failed ot register prometheus: %w", err)
+		klog.Errorf("failed ot register prometheus: %v", err)
 	}
 
 	// Serve
@@ -358,8 +355,8 @@ func startDaemon(c *cli.Context) error {
 		opTimeout:            opTimeout,
 	}
 
-	klog.Infoln("Starting s3_prober", version.Info())
-	klog.Infoln("Build context", version.BuildContext())
+	klog.Infoln("Starting s3_prober")
+	klog.Infoln("Build context")
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/probe", func(w http.ResponseWriter, r *http.Request) {
