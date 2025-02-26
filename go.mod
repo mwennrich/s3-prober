@@ -1,6 +1,6 @@
 module s3-prober.go
 
-go 1.23
+go 1.24
 
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
