@@ -124,7 +124,6 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(
 				s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "makebucket", e.endpoint,
 			)
-
 		}
 		ch <- prometheus.MustNewConstMetric(
 			s3Success, prometheus.GaugeValue, 0, "put", e.endpoint,
@@ -274,7 +273,7 @@ func startCmd() *cli.Command {
 			},
 			&cli.IntFlag{
 				Name:    flagOpTimeout,
-				Usage:   "Optional. Timout in seconds after which an operation is considered as failed.",
+				Usage:   "Optional. Timeout in seconds after which an operation is considered as failed.",
 				EnvVars: []string{envOpTimeout},
 				Value:   defaultOpTimeout,
 			},
@@ -355,9 +354,7 @@ func startDaemon(c *cli.Context) error {
 		opTimeout:            opTimeout,
 	}
 
-	klog.Infoln("Starting s3_prober")
-	klog.Infoln("Build context")
-
+	klog.Infof("Starting s3_prober (op timeout %ds, skipmakedeletebucket %v)\n", opTimeout, c.Bool(flagSkipmakedeletebucket))
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/probe", func(w http.ResponseWriter, r *http.Request) {
 		probeHandler(w, r, exporter)
