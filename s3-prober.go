@@ -122,7 +122,7 @@ func (e Exporter) Collect(ch chan<- prometheus.Metric) {
 				s3Success, prometheus.GaugeValue, 0, "removebucket", e.endpoint,
 			)
 			ch <- prometheus.MustNewConstMetric(
-				s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "makebucket", e.endpoint,
+				s3Duration, prometheus.GaugeValue, float64(e.opTimeout), "removebucket", e.endpoint,
 			)
 		}
 		ch <- prometheus.MustNewConstMetric(
