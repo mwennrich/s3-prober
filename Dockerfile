@@ -8,8 +8,10 @@ WORKDIR /work
 
 RUN make s3-prober
 
-FROM gcr.io/distroless/static
+FROM scratch
 COPY --from=builder /work/s3-prober /s3-prober
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 USER 999
+
 ENTRYPOINT ["/s3-prober"]
