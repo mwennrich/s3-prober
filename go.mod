@@ -1,6 +1,6 @@
 module s3-prober.go
 
-go 1.24
+go 1.25
 
 require (
 	github.com/minio/minio-go/v7 v7.0.87
