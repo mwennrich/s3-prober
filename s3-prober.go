@@ -379,7 +379,9 @@ func startDaemon(c *cli.Context) error {
 		ReadHeaderTimeout: 1 * time.Minute,
 	}
 
-	klog.Fatal(server.ListenAndServe())
+	if err := server.ListenAndServe(); err != nil {
+		return fmt.Errorf("s3 prober server failed: %w", err)
+	}
 	return nil
 }
 
