@@ -6,7 +6,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/prometheus/client_golang v1.23.2
 	github.com/urfave/cli/v2 v2.27.7
-	k8s.io/klog/v2 v2.130.1
+	k8s.io/klog/v2 v2.140.0
 )
 
 require (
