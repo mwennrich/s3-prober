@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"k8s.io/klog/v2"
 
 	"github.com/minio/minio-go/v7"
@@ -268,48 +268,48 @@ func startCmd() *cli.Command {
 			&cli.StringFlag{
 				Name:    flagListenAddress,
 				Usage:   "Optional. Specify listen address.",
-				EnvVars: []string{envListenAddress},
+				Sources: cli.EnvVars(envListenAddress),
 				Value:   defaultListenAddress,
 			},
 			&cli.IntFlag{
 				Name:    flagOpTimeout,
 				Usage:   "Optional. Timeout in seconds after which an operation is considered as failed.",
-				EnvVars: []string{envOpTimeout},
+				Sources: cli.EnvVars(envOpTimeout),
 				Value:   defaultOpTimeout,
 			},
 			&cli.StringFlag{
 				Name:    flagAccessKey,
 				Usage:   "Required. Specify s3 access key.",
-				EnvVars: []string{envAccessKey},
+				Sources: cli.EnvVars(envAccessKey),
 			},
 			&cli.StringFlag{
 				Name:    flagSecretKey,
 				Usage:   "Required. Specify s3 secret key.",
-				EnvVars: []string{envSecretKey},
+				Sources: cli.EnvVars(envSecretKey),
 			},
 			&cli.StringFlag{
 				Name:    flagEndpoint,
 				Usage:   "Required. Specify s3 endpoint url.",
-				EnvVars: []string{envEndpoint},
+				Sources: cli.EnvVars(envEndpoint),
 			},
 			&cli.StringFlag{
 				Name:    flagBucket,
 				Usage:   "Required. Specify s3 bucket name.",
-				EnvVars: []string{envBucket},
+				Sources: cli.EnvVars(envBucket),
 			},
 			&cli.StringFlag{
 				Name:    flagFilename,
 				Usage:   "Required. Specify filename.",
-				EnvVars: []string{envFilename},
+				Sources: cli.EnvVars(envFilename),
 			},
 			&cli.BoolFlag{
 				Name:    flagSkipmakedeletebucket,
 				Usage:   "Optional. Measure skipmakedeletebucket operations",
-				EnvVars: []string{envSkipmakedeletebucket},
+				Sources: cli.EnvVars(envSkipmakedeletebucket),
 			},
 		},
-		Action: func(c *cli.Context) error {
-			if err := startDaemon(c); err != nil {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			if err := startDaemon(cmd); err != nil {
 				klog.Fatalf("Error starting daemon: %v", err)
 				return err
 			}
@@ -318,27 +318,27 @@ func startCmd() *cli.Command {
 	}
 }
 
-func startDaemon(c *cli.Context) error {
+func startDaemon(cmd *cli.Command) error {
 
-	listenAddress := c.String(flagListenAddress)
-	opTimeout := c.Int(flagOpTimeout)
-	bucket := c.String(flagBucket)
+	listenAddress := cmd.String(flagListenAddress)
+	opTimeout := cmd.Int(flagOpTimeout)
+	bucket := cmd.String(flagBucket)
 	if bucket == "" {
 		return fmt.Errorf("invalid empty flag %v", flagBucket)
 	}
-	endpoint := c.String(flagEndpoint)
+	endpoint := cmd.String(flagEndpoint)
 	if endpoint == "" {
 		return fmt.Errorf("invalid empty flag %v", flagEndpoint)
 	}
-	accessKey := c.String(flagAccessKey)
+	accessKey := cmd.String(flagAccessKey)
 	if accessKey == "" {
 		return fmt.Errorf("invalid empty flag %v", flagAccessKey)
 	}
-	secretKey := c.String(flagSecretKey)
+	secretKey := cmd.String(flagSecretKey)
 	if secretKey == "" {
 		return fmt.Errorf("invalid empty flag %v", flagSecretKey)
 	}
-	filename := c.String(flagFilename)
+	filename := cmd.String(flagFilename)
 	if filename == "" {
 		return fmt.Errorf("invalid empty flag %v", flagFilename)
 	}
@@ -349,12 +349,12 @@ func startDaemon(c *cli.Context) error {
 		secretKey:            secretKey,
 		endpoint:             endpoint,
 		filename:             filename,
-		skipmakedeletebucket: c.Bool(flagSkipmakedeletebucket),
+		skipmakedeletebucket: cmd.Bool(flagSkipmakedeletebucket),
 		mutex:                &sync.Mutex{},
 		opTimeout:            opTimeout,
 	}
 
-	klog.Infof("Starting s3_prober (op timeout %ds, skipmakedeletebucket %v)\n", opTimeout, c.Bool(flagSkipmakedeletebucket))
+	klog.Infof("Starting s3_prober (op timeout %ds, skipmakedeletebucket %v)\n", opTimeout, cmd.Bool(flagSkipmakedeletebucket))
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/probe", func(w http.ResponseWriter, r *http.Request) {
 		probeHandler(w, r, exporter)
@@ -386,13 +386,15 @@ func startDaemon(c *cli.Context) error {
 }
 
 func main() {
-	a := cli.NewApp()
-	a.Usage = "S3 Prober"
-	a.Commands = []*cli.Command{
-		startCmd(),
+	root := &cli.Command{
+		Name:  "s3-prober",
+		Usage: "S3 Prober",
+		Commands: []*cli.Command{
+			startCmd(),
+		},
 	}
 
-	if err := a.Run(os.Args); err != nil {
+	if err := root.Run(context.Background(), os.Args); err != nil {
 		klog.Fatalf("Critical error: %v", err)
 	}
 }
