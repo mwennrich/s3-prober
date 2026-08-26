@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/prometheus/client_golang v1.24.1
-	github.com/urfave/cli/v2 v2.27.7
+	github.com/urfave/cli/v3 v3.11.0
 	github.com/urfave/cli/v3 v3.11.0
 	k8s.io/klog/v2 v2.140.0
 )
